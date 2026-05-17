@@ -1153,10 +1153,15 @@ Return 4-6 tree species and 4-6 infrastructure solutions appropriate for the eco
 
 function parseJSON(text) {
   let clean = text.trim();
-  clean = clean.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+  // Strip ALL markdown code fences (multiline-safe)
+  clean = clean.replace(/```json[\s\S]*?```/gi, (m) => m.replace(/```json\s*/i, '').replace(/\s*```/, ''));
+  clean = clean.replace(/```[\s\S]*?```/gi, (m) => m.replace(/```\s*/, '').replace(/\s*```/, ''));
+  // Extract the first complete JSON object
   const start = clean.indexOf('{');
   const end = clean.lastIndexOf('}');
   if (start !== -1 && end !== -1) clean = clean.slice(start, end + 1);
+  // Remove any remaining backtick artifacts
+  clean = clean.replace(/`/g, '');
   return JSON.parse(clean);
 }
 
