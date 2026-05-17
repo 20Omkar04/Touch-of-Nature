@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>EcoSuggest – ESG Decision Dashboard</title>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- html2pdf.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+<!-- Google Fonts: Syne + DM Sans -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          display: ['Syne', 'sans-serif'],
+          body: ['DM Sans', 'sans-serif'],
+        },
+        colors: {
+          forest: {
+            950: '#020d07',
+            900: '#041a0d',
+            800: '#072b16',
+            700: '#0c3d20',
+            600: '#115229',
+            500: '#166534',
+          },
+          emerald: { 400: '#34d399', 500: '#10b981', 600: '#059669' },
+          slate: {
+            950: '#020617', 900: '#0f172a', 850: '#0f1c2e',
+            800: '#1e293b', 750: '#243040', 700: '#334155',
+            600: '#475569', 500: '#64748b', 400: '#94a3b8',
+            300: '#cbd5e1', 200: '#e2e8f0',
+          },
+        },
+        animation: {
+          'fade-in': 'fadeIn 0.6s ease forwards',
+          'slide-up': 'slideUp 0.5s ease forwards',
+          'pulse-slow': 'pulse 3s ease-in-out infinite',
+          'spin-slow': 'spin 8s linear infinite',
+          'gauge-fill': 'gaugeFill 1.2s ease-out forwards',
+        },
+        keyframes: {
+          fadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+          slideUp: { from: { opacity: 0, transform: 'translateY(24px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+          gaugeFill: { from: { strokeDashoffset: 251 }, to: {} },
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #020d07;
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+  h1, h2, h3, h4, .font-display { font-family: 'Syne', sans-serif; }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #041a0d; }
+  ::-webkit-scrollbar-thumb { background: #115229; border-radius: 3px; }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  /* Gradient mesh bg */
+  .mesh-bg {
+    background:
+      radial-gradient(ellipse 80% 50% at 10% 20%, rgba(5,150,105,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 60% at 90% 80%, rgba(7,43,22,0.3) 0%, transparent 60%),
+      #020d07;
+  }
+
+  /* Range slider styling */
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%; height: 4px;
+    background: #1e293b; border-radius: 2px; outline: none;
+    transition: background 0.3s;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%; background: #059669;
+    cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 0 0 3px rgba(5,150,105,0.2);
+  }
+  input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+    box-shadow: 0 0 0 6px rgba(5,150,105,0.3);
+  }
+  input[type=range].yellow::-webkit-slider-thumb { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+  input[type=range].red::-webkit-slider-thumb { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.2); }
+
+  /* Card style */
+  .card {
+    background: linear-gradient(135deg, rgba(30,41,59,0.8) 0%, rgba(15,26,13,0.6) 100%);
+    border: 1px solid rgba(5,150,105,0.15);
+    border-radius: 16px;
+    backdrop-filter: blur(8px);
+  }
+  .card-green { border-color: rgba(5,150,105,0.35); }
+  .card-yellow { border-color: rgba(245,158,11,0.35); }
+  .card-red { border-color: rgba(239,68,68,0.35); }
+
+  /* Severity badge */
+  .badge-green { background: rgba(5,150,105,0.2); color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
+  .badge-yellow { background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+  .badge-red { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+
+  /* Animated gauge */
+  .gauge-ring { transform: rotate(-90deg); transform-origin: center; }
+  .gauge-track { fill: none; stroke: #1e293b; stroke-width: 8; }
+  .gauge-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1); }
+
+  /* Heatmap grid */
+  .heatmap-cell {
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  .heatmap-cell:hover { transform: scale(1.15); z-index: 10; position: relative; }
+
+  /* Loading shimmer */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .shimmer {
+    background: linear-gradient(90deg, #1e293b 25%, #243040 50%, #1e293b 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  /* Reveal animation */
+  .reveal { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(2,13,7,0.85); backdrop-filter: blur(6px);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+
+  /* Tab active */
+  .tab-btn.active {
+    background: rgba(5,150,105,0.25);
+    border-color: rgba(52,211,153,0.5);
+    color: #34d399;
+  }
+
+  /* Preset badge */
+  .preset-chip {
+    cursor: pointer; padding: 4px 12px; border-radius: 20px; font-size: 12px;
+    border: 1px solid rgba(5,150,105,0.3); color: #94a3b8;
+    transition: all 0.2s; background: rgba(15,26,13,0.5);
+  }
+  .preset-chip:hover { background: rgba(5,150,105,0.2); color: #34d399; border-color: rgba(52,211,153,0.5); }
+  .preset-chip.active { background: rgba(5,150,105,0.3); color: #34d399; border-color: #34d399; }
+
+  /* Score ring glow */
+  .score-glow { filter: drop-shadow(0 0 12px rgba(52,211,153,0.5)); }
+
+  /* Pulse dot */
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+  .pulse-dot { animation: pulseDot 2s ease-in-out infinite; }
+
+  /* Tree card */
+  .tree-card {
+    background: linear-gradient(135deg, rgba(7,43,22,0.6) 0%, rgba(15,26,13,0.4) 100%);
+    border: 1px solid rgba(52,211,153,0.2);
+    border-radius: 12px; padding: 16px;
+    transition: all 0.25s ease;
+  }
+  .tree-card:hover { border-color: rgba(52,211,153,0.5); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(5,150,105,0.15); }
+
+  /* Infra card */
+  .infra-card {
+    background: linear-gradient(135deg, rgba(3,105,161,0.1) 0%, rgba(15,26,13,0.4) 100%);
+    border: 1px solid rgba(56,189,248,0.2);
+    border-radius: 12px; padding: 16px;
+    transition: all 0.25s ease;
+  }
+  .infra-card:hover { border-color: rgba(56,189,248,0.4); transform: translateY(-2px); }
+
+  /* Before/after split */
+  .ba-before { background: linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(30,41,59,0.6) 100%); border: 1px solid rgba(239,68,68,0.2); }
+  .ba-after { background: linear-gradient(135deg, rgba(5,150,105,0.1) 0%, rgba(30,41,59,0.6) 100%); border: 1px solid rgba(5,150,105,0.3); }
+
+  /* Generate button */
+  .btn-generate {
+    background: linear-gradient(135deg, #059669 0%, #047857 50%, #065f46 100%);
+    box-shadow: 0 4px 24px rgba(5,150,105,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
+    transition: all 0.2s ease;
+  }
+  .btn-generate:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(5,150,105,0.5), inset 0 1px 0 rgba(255,255,255,0.15);
+  }
+  .btn-generate:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* Floating ESG score */
+  .esg-float {
+    background: linear-gradient(135deg, rgba(7,43,22,0.95) 0%, rgba(4,26,13,0.98) 100%);
+    border: 1px solid rgba(52,211,153,0.4);
+    box-shadow: 0 8px 32px rgba(5,150,105,0.2);
+  }
+
+  /* Spinner */
+  @keyframes spinnerAnim {
+    to { transform: rotate(360deg); }
+  }
+  .spinner { animation: spinnerAnim 0.8s linear infinite; }
+
+  /* Scenario simulator */
+  .sim-row {
+    background: rgba(15,26,13,0.4);
+    border: 1px solid rgba(5,150,105,0.15);
+    border-radius: 8px; padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+
+  /* Chart container */
+  .chart-wrap { position: relative; }
+
+  /* Metric chip */
+  .metric-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  }
+
+  /* Section divider */
+  .sec-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(5,150,105,0.3) 50%, transparent 100%);
+    margin: 32px 0;
+  }
+
+  /* Export button */
+  .btn-export {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    border: 1px solid rgba(52,211,153,0.4);
+    transition: all 0.2s ease;
+  }
+  .btn-export:hover { border-color: #34d399; box-shadow: 0 4px 16px rgba(52,211,153,0.2); }
+
+  /* Scenario delta badge */
+  .delta-pos { color: #34d399; }
+  .delta-neg { color: #f87171; }
+</style>
+</head>
+
+<body class="mesh-bg font-body relative">
+
+<!-- ════════════════════════════════════════════
+     SETTINGS MODAL
+════════════════════════════════════════════ -->
+<div id="settingsModal" class="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div class="card w-full max-w-lg mx-4 p-6 animate-fade-in" style="max-height:90vh;overflow-y:auto">
+    <div class="flex items-center justify-between mb-5">
+      <h3 class="font-display text-lg font-700 text-white">API Connectivity Settings</h3>
+      <button onclick="closeModal()" class="text-slate-400 hover:text-white transition-colors p-1">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- Mode tabs -->
+    <div class="flex gap-2 mb-5">
+      <button class="tab-btn active flex-1 py-2 px-3 rounded-lg border border-slate-700 text-sm font-500 transition-all" data-mode="local" onclick="switchMode('local',this)">🌿 Local Sim</button>
+      <button class="tab-btn flex-1 py-2 px-3 rounded-lg border border-slate-700 text-sm font-500 transition-all text-slate-400" data-mode="openrouter" onclick="switchMode('openrouter',this)">⚡ OpenRouter</button>
+      <button class="tab-btn flex-1 py-2 px-3 rounded-lg border border-slate-700 text-sm font-500 transition-all text-slate-400" data-mode="supabase" onclick="switchMode('supabase',this)">🔒 Supabase</button>
+    </div>
+
+    <!-- Local mode -->
+    <div id="panel-local" class="mode-panel">
+      <div class="rounded-xl p-4 bg-emerald-900/20 border border-emerald-600/30 mb-4">
+        <p class="text-emerald-300 text-sm font-500 mb-1">✅ No API keys required</p>
+        <p class="text-slate-400 text-xs">Uses a built-in intelligent simulation engine to generate hyper-realistic ESG proposals. Perfect for demos and offline use.</p>
+      </div>
+      <button onclick="saveSettings();closeModal()" class="w-full btn-generate text-white font-600 py-2.5 rounded-xl text-sm">Activate Local Mode</button>
+    </div>
+
+    <!-- OpenRouter mode -->
+    <div id="panel-openrouter" class="mode-panel hidden">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5 font-500">OpenRouter API Key</label>
+          <input id="or-key" type="password" placeholder="sk-or-v1-..." value=""
+            class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5 font-500">Model String</label>
+          <input id="or-model" type="text" placeholder="anthropic/claude-3-haiku" value=""
+            class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors" />
+        </div>
+        <div class="rounded-lg p-3 bg-amber-900/15 border border-amber-600/25">
+          <p class="text-amber-300/80 text-xs">⚠️ Direct frontend mode — API key will be stored in localStorage. Use Local Sim or Supabase for production.</p>
+        </div>
+        <button onclick="saveSettings();closeModal()" class="w-full btn-generate text-white font-600 py-2.5 rounded-xl text-sm">Save & Connect</button>
+      </div>
+    </div>
+
+    <!-- Supabase mode -->
+    <div id="panel-supabase" class="mode-panel hidden">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5 font-500">Edge Function Endpoint URL</label>
+          <input id="sb-url" type="text" placeholder="https://xxxx.supabase.co/functions/v1/generate-esg" value=""
+            class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors" />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1.5 font-500">Supabase Anon Key</label>
+          <input id="sb-anon" type="password" placeholder="eyJhbGciOiJIUzI1NiIs..." value=""
+            class="w-full bg-slate-800/80 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors" />
+        </div>
+        <div class="rounded-lg p-3 bg-blue-900/15 border border-blue-600/25">
+          <p class="text-blue-300/80 text-xs">🔒 Secure production mode — LLM keys remain server-side. Your Anon Key is sent via Authorization Bearer header.</p>
+        </div>
+        <button onclick="saveSettings();closeModal()" class="w-full btn-generate text-white font-600 py-2.5 rounded-xl text-sm">Save & Connect</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════ -->
+<header class="sticky top-0 z-50 border-b border-emerald-900/40" style="background:rgba(2,13,7,0.92);backdrop-filter:blur(12px)">
+  <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+    <!-- Logo -->
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#059669,#047857)">
+        <i data-lucide="leaf" class="w-4 h-4 text-white"></i>
+      </div>
+      <div>
+        <span class="font-display text-white font-700 text-lg tracking-tight">EcoSuggest</span>
+        <span class="text-emerald-500 text-xs ml-2 hidden sm:inline">ESG Decision Dashboard</span>
+      </div>
+    </div>
+
+    <!-- Center: Live ESG Score -->
+    <div id="liveScoreBadge" class="esg-float flex items-center gap-2.5 px-4 py-2 rounded-full">
+      <div class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></div>
+      <span class="text-slate-400 text-xs font-500">Live ESG Score</span>
+      <span id="liveScoreVal" class="font-display text-white font-700 text-base">—</span>
+      <span id="liveScoreBadgeChip" class="metric-chip hidden"></span>
+    </div>
+
+    <!-- Right: mode indicator + settings -->
+    <div class="flex items-center gap-3">
+      <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full" style="background:rgba(5,150,105,0.12);border:1px solid rgba(5,150,105,0.25)">
+        <span id="modeIndicatorDot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        <span id="modeIndicatorText" class="text-xs text-slate-400 font-500">Local Sim</span>
+      </div>
+      <button onclick="openModal()" class="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all">
+        <i data-lucide="settings" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════════
+     MAIN CONTENT
+════════════════════════════════════════════ -->
+<main class="max-w-screen-xl mx-auto px-4 sm:px-6 py-8 relative z-10">
+
+  <!-- Hero text -->
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="metric-chip badge-green text-xs">ESG Intelligence Platform</span>
+      <span class="metric-chip" style="background:rgba(51,65,85,0.5);color:#94a3b8;border:1px solid rgba(71,85,105,0.4)">v2.0 Analyst Edition</span>
+    </div>
+    <h1 class="font-display text-3xl sm:text-4xl font-800 text-white leading-tight mb-2">
+      Environmental Decision<br class="hidden sm:block" />
+      <span style="background:linear-gradient(90deg,#34d399,#059669);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Intelligence Engine</span>
+    </h1>
+    <p class="text-slate-400 text-sm max-w-xl">Input complex environmental parameters and receive AI-driven botanical and infrastructural ESG solutions, complete with projections and export-ready reports.</p>
+  </div>
+
+  <!-- ── INPUT MATRIX ── -->
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+
+    <!-- Section 1: Environmental Inputs -->
+    <div class="xl:col-span-2 card p-5">
+      <div class="flex items-center gap-2 mb-5">
+        <i data-lucide="flask-conical" class="w-4 h-4 text-emerald-400"></i>
+        <h2 class="font-display text-base font-700 text-white">Section 1 — Environmental Inputs</h2>
+      </div>
+
+      <!-- Location Presets -->
+      <div class="mb-4">
+        <p class="text-xs text-slate-500 mb-2 font-500">Quick Presets</p>
+        <div class="flex flex-wrap gap-2">
+          <span class="preset-chip" onclick="applyPreset('arid')">🏜️ Arid/Desertified</span>
+          <span class="preset-chip" onclick="applyPreset('urban')">🏙️ Urban Concrete</span>
+          <span class="preset-chip" onclick="applyPreset('industrial')">🏭 Industrial Hotspot</span>
+          <span class="preset-chip" onclick="applyPreset('coastal')">🌊 Coastal Wetland</span>
+          <span class="preset-chip" onclick="applyPreset('tropical')">🌿 Tropical Forest</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="envInputs">
+        <!-- Sliders injected by JS -->
+      </div>
+    </div>
+
+    <!-- Section 2 + 3: Geo & Risk -->
+    <div class="flex flex-col gap-4">
+
+      <!-- Section 2: Geographic -->
+      <div class="card p-5">
+        <div class="flex items-center gap-2 mb-4">
+          <i data-lucide="map-pin" class="w-4 h-4 text-blue-400"></i>
+          <h2 class="font-display text-sm font-700 text-white">Section 2 — Geographic & Climate</h2>
+        </div>
+        <div class="space-y-3" id="geoInputs">
+          <!-- Injected by JS -->
+        </div>
+      </div>
+
+      <!-- Section 3: Risk Metrics -->
+      <div class="card p-5">
+        <div class="flex items-center gap-2 mb-4">
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+          <h2 class="font-display text-sm font-700 text-white">Section 3 — Risk & Sustainability</h2>
+        </div>
+        <div class="space-y-3" id="riskInputs">
+          <!-- Injected by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PREDICTIVE SCENARIO SIMULATOR ── -->
+  <div class="card p-5 mb-8">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+        <h2 class="font-display text-base font-700 text-white">Predictive Scenario Simulator</h2>
+        <span class="metric-chip badge-yellow text-xs ml-1">Interactive</span>
+      </div>
+      <button onclick="resetSimulator()" class="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors">
+        <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Reset
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="simulatorPanel">
+      <!-- Injected by JS -->
+    </div>
+
+    <div class="mt-4 pt-4 border-t border-slate-700/40 flex flex-wrap gap-4 items-center">
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-slate-500">Scenario Impact Preview:</span>
+        <span id="simDeltaLabel" class="text-sm font-600 text-slate-300">Adjust sliders above to preview macro-shift impact</span>
+      </div>
+      <div id="simDeltaBadges" class="flex gap-2"></div>
+    </div>
+  </div>
+
+  <!-- ── GENERATE BUTTON ── -->
+  <div class="flex flex-col sm:flex-row items-center gap-4 mb-8">
+    <button id="generateBtn" onclick="triggerESGAnalysis()" class="btn-generate text-white font-display font-700 px-8 py-4 rounded-2xl text-base flex items-center gap-3 w-full sm:w-auto justify-center">
+      <i data-lucide="cpu" class="w-5 h-5"></i>
+      Generate ESG Proposal
+      <span id="btnArrow" class="ml-1">→</span>
+    </button>
+    <div id="generateStatus" class="text-sm text-slate-500 hidden flex items-center gap-2">
+      <svg class="spinner w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+      <span id="generateStatusText">Analyzing environmental parameters…</span>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       RESULTS DASHBOARD (hidden until generated)
+  ════════════════════════════════════════════ -->
+  <div id="resultsDashboard" class="hidden">
+    <div id="resultsContent">
+
+      <!-- Results header -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+            <span class="text-xs text-emerald-400 font-500 uppercase tracking-wider">Analysis Complete</span>
+          </div>
+          <h2 class="font-display text-2xl font-700 text-white">ESG Intelligence Report</h2>
+        </div>
+        <button onclick="exportPDF()" class="btn-export flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-600 text-emerald-300">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          Export PDF
+        </button>
+      </div>
+
+      <!-- Executive Summary -->
+      <div class="card card-green p-6 mb-6 reveal" id="r-summary">
+        <div class="flex items-center gap-2 mb-3">
+          <i data-lucide="file-text" class="w-4 h-4 text-emerald-400"></i>
+          <h3 class="font-display text-base font-700 text-white">Executive Summary</h3>
+        </div>
+        <p id="summaryText" class="text-slate-300 text-sm leading-relaxed"></p>
+        <div class="mt-4 flex flex-wrap gap-3" id="summaryMetrics"></div>
+      </div>
+
+      <!-- Gauges row -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6" id="r-gauges">
+        <!-- Injected by JS -->
+      </div>
+
+      <!-- Heatmap + Chart row -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Heatmap -->
+        <div class="card p-5 reveal" id="r-heatmap">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="grid-3x3" class="w-4 h-4 text-blue-400"></i>
+            <h3 class="font-display text-sm font-700 text-white">Environmental Risk Heatmap</h3>
+          </div>
+          <div id="heatmapGrid" class="grid gap-1.5" style="grid-template-columns:repeat(10,1fr)"></div>
+          <div class="mt-3 flex gap-3 flex-wrap">
+            <div class="flex items-center gap-1.5 text-xs text-slate-400"><span class="w-3 h-3 rounded-sm inline-block" style="background:#22c55e"></span>Healthy</div>
+            <div class="flex items-center gap-1.5 text-xs text-slate-400"><span class="w-3 h-3 rounded-sm inline-block" style="background:#f59e0b"></span>Moderate Risk</div>
+            <div class="flex items-center gap-1.5 text-xs text-slate-400"><span class="w-3 h-3 rounded-sm inline-block" style="background:#ef4444"></span>Critical</div>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="card p-5 reveal" id="r-chart">
+          <div class="flex items-center gap-2 mb-3">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-purple-400"></i>
+            <h3 class="font-display text-sm font-700 text-white">Current vs Projected ESG Analysis</h3>
+          </div>
+          <div class="chart-wrap" style="height:260px">
+            <canvas id="esgChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tree Recommendations -->
+      <div class="card p-5 mb-6 reveal" id="r-trees">
+        <div class="flex items-center gap-2 mb-4">
+          <i data-lucide="trees" class="w-4 h-4 text-emerald-400"></i>
+          <h3 class="font-display text-base font-700 text-white">Afforestation & Botanical Proposals</h3>
+          <span id="treeCount" class="metric-chip badge-green text-xs ml-1"></span>
+        </div>
+        <div id="treeCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+      </div>
+
+      <!-- Infrastructure Solutions -->
+      <div class="card p-5 mb-6 reveal" id="r-infra">
+        <div class="flex items-center gap-2 mb-4">
+          <i data-lucide="building-2" class="w-4 h-4 text-sky-400"></i>
+          <h3 class="font-display text-base font-700 text-white">Infrastructure & Systems Solutions</h3>
+        </div>
+        <div id="infraCards" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+      </div>
+
+      <!-- Before / After -->
+      <div class="card p-5 mb-6 reveal" id="r-ba">
+        <div class="flex items-center gap-2 mb-4">
+          <i data-lucide="arrow-left-right" class="w-4 h-4 text-amber-400"></i>
+          <h3 class="font-display text-base font-700 text-white">Before / After Sustainability Transformation</h3>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="ba-before rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <i data-lucide="x-circle" class="w-4 h-4 text-red-400"></i>
+              <span class="font-display text-sm font-700 text-red-300">Current State</span>
+            </div>
+            <ul id="beforeList" class="space-y-1.5 text-sm text-slate-300"></ul>
+          </div>
+          <div class="ba-after rounded-xl p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+              <span class="font-display text-sm font-700 text-emerald-300">Projected State (5 years)</span>
+            </div>
+            <ul id="afterList" class="space-y-1.5 text-sm text-slate-300"></ul>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /resultsContent -->
+  </div><!-- /resultsDashboard -->
+
+</main>
+
+<!-- Footer -->
+<footer class="border-t border-emerald-900/30 mt-12 py-6 text-center relative z-10">
+  <p class="text-slate-600 text-xs">EcoSuggest ESG Dashboard · Built for environmental intelligence · <span class="text-emerald-800">Powered by AI</span></p>
+</footer>
+
+<!-- ════════════════════════════════════════════
+     JAVASCRIPT ENGINE
+════════════════════════════════════════════ -->
+<script>
+// ─────────────────────────────────────────────
+// APP STATE
+// ─────────────────────────────────────────────
+const state = {
+  mode: localStorage.getItem('esg_mode') || 'local',
+  orKey: localStorage.getItem('esg_or_key') || '',
+  orModel: localStorage.getItem('esg_or_model') || 'anthropic/claude-3-haiku',
+  sbUrl: localStorage.getItem('esg_sb_url') || '',
+  sbAnon: localStorage.getItem('esg_sb_anon') || '',
+  simDeltas: { aqi: 0, greenCover: 0, temperature: 0, rainfall: 0 },
+  chart: null,
+  baseValues: {},
+};
+
+// ─────────────────────────────────────────────
+// SLIDER CONFIG
+// ─────────────────────────────────────────────
+const ENV_SLIDERS = [
+  { id: 'soilPH', label: 'Soil pH', min: 0, max: 14, val: 6.5, step: 0.1, unit: '', good: [6,7.5], bad: [0,4.5] },
+  { id: 'rainfall', label: 'Annual Rainfall (mm)', min: 0, max: 3000, val: 800, step: 10, unit: 'mm', good: [600,2000], bad: [0,200] },
+  { id: 'avgTemp', label: 'Avg Temperature (°C)', min: -10, max: 55, val: 24, step: 0.5, unit: '°C', good: [10,28], bad: [38,55] },
+  { id: 'aqi', label: 'Air Quality Index (AQI)', min: 0, max: 500, val: 80, step: 1, unit: '', good: [0,50], bad: [150,500] },
+  { id: 'humidity', label: 'Humidity (%)', min: 0, max: 100, val: 55, step: 1, unit: '%', good: [40,70], bad: [0,20] },
+  { id: 'groundwater', label: 'Groundwater Level (m)', min: 0, max: 100, val: 15, step: 0.5, unit: 'm', good: [0,10], bad: [50,100] },
+  { id: 'windSpeed', label: 'Wind Speed (km/h)', min: 0, max: 150, val: 20, step: 1, unit: 'km/h', good: [5,30], bad: [80,150] },
+  { id: 'greenCover', label: 'Green Cover %', min: 0, max: 100, val: 35, step: 1, unit: '%', good: [40,100], bad: [0,10] },
+  { id: 'biodiversity', label: 'Biodiversity Score (0-100)', min: 0, max: 100, val: 55, step: 1, unit: '', good: [60,100], bad: [0,20] },
+  { id: 'waterQuality', label: 'Water Quality Index (0-100)', min: 0, max: 100, val: 60, step: 1, unit: '', good: [70,100], bad: [0,30] },
+  { id: 'noise', label: 'Noise Pollution (dB)', min: 20, max: 120, val: 55, step: 1, unit: 'dB', good: [20,50], bad: [80,120] },
+  { id: 'carbonEmission', label: 'Carbon Emission Density', min: 0, max: 500, val: 120, step: 1, unit: 't/km²', good: [0,50], bad: [200,500] },
+  { id: 'wasteEfficiency', label: 'Waste Management (%)', min: 0, max: 100, val: 60, step: 1, unit: '%', good: [70,100], bad: [0,30] },
+  { id: 'renewableEnergy', label: 'Renewable Energy Use %', min: 0, max: 100, val: 30, step: 1, unit: '%', good: [50,100], bad: [0,15] },
+];
+
+const GEO_FIELDS = [
+  { id: 'climateZone', label: 'Satellite Climate Zone', type: 'select', options: ['Tropical','Arid','Semi-arid','Temperate','Continental','Polar','Mediterranean'] },
+  { id: 'elevation', label: 'Elevation (m)', min: -200, max: 5000, val: 150, step: 10, unit: 'm', good: [0,2000], bad: [] },
+  { id: 'distWater', label: 'Distance from Water Body (km)', min: 0, max: 500, val: 20, step: 1, unit: 'km', good: [0,5], bad: [100,500] },
+  { id: 'popDensity', label: 'Population Density (ppl/km²)', min: 0, max: 50000, val: 800, step: 50, unit: '', good: [0,200], bad: [5000,50000] },
+  { id: 'urbanRate', label: 'Urbanization Rate (%)', min: 0, max: 100, val: 40, step: 1, unit: '%', good: [0,30], bad: [70,100] },
+];
+
+const RISK_FIELDS = [
+  { id: 'floodProb', label: 'Flood Probability (%)', min: 0, max: 100, val: 20, step: 1, unit: '%', good: [0,10], bad: [50,100] },
+  { id: 'heatwaveFreq', label: 'Heatwave Frequency (events/yr)', min: 0, max: 30, val: 5, step: 0.5, unit: '/yr', good: [0,2], bad: [10,30] },
+  { id: 'wildfireRisk', label: 'Wildfire Risk (%)', min: 0, max: 100, val: 20, step: 1, unit: '%', good: [0,10], bad: [50,100] },
+  { id: 'droughtSeverity', label: 'Drought Severity Index (0-10)', min: 0, max: 10, val: 3, step: 0.1, unit: '', good: [0,2], bad: [6,10] },
+  { id: 'soilFertility', label: 'Soil Fertility Score (0-100)', min: 0, max: 100, val: 55, step: 1, unit: '', good: [60,100], bad: [0,20] },
+  { id: 'climateResilience', label: 'Climate Resilience Score (0-100)', min: 0, max: 100, val: 50, step: 1, unit: '', good: [60,100], bad: [0,20] },
+];
+
+// ─────────────────────────────────────────────
+// SEVERITY HELPERS
+// ─────────────────────────────────────────────
+function getSeverity(cfg, val) {
+  if (!cfg) return 'green';
+  const v = parseFloat(val);
+  if (cfg.bad && cfg.bad.length === 2) {
+    const [bLo, bHi] = cfg.bad;
+    if (bLo < bHi && v >= bLo && v <= bHi) return 'red';
+  }
+  if (cfg.good && cfg.good.length === 2) {
+    const [gLo, gHi] = cfg.good;
+    if (gLo < gHi && v >= gLo && v <= gHi) return 'green';
+  }
+  return 'yellow';
+}
+
+const SEV_BORDER = { green: 'rgba(5,150,105,0.35)', yellow: 'rgba(245,158,11,0.35)', red: 'rgba(239,68,68,0.35)' };
+const SEV_LABEL = { green: 'Healthy', yellow: 'Moderate', red: 'Critical' };
+
+// ─────────────────────────────────────────────
+// BUILD SLIDERS
+// ─────────────────────────────────────────────
+function buildSlider(cfg, container) {
+  const div = document.createElement('div');
+  div.id = `wrap_${cfg.id}`;
+  div.style.border = `1px solid ${SEV_BORDER.green}`;
+  div.style.borderRadius = '10px';
+  div.style.padding = '10px 12px';
+  div.style.transition = 'border-color 0.3s';
+  div.style.background = 'rgba(15,26,13,0.3)';
+
+  const val = cfg.val !== undefined ? cfg.val : ((cfg.min + cfg.max) / 2);
+  div.innerHTML = `
+    <div class="flex items-center justify-between mb-1.5">
+      <label class="text-xs text-slate-400 font-500">${cfg.label}</label>
+      <div class="flex items-center gap-1.5">
+        <span id="sev_${cfg.id}" class="text-xs px-1.5 py-0.5 rounded font-500" style="background:rgba(5,150,105,0.2);color:#34d399">${SEV_LABEL.green}</span>
+        <span id="disp_${cfg.id}" class="text-xs font-600 text-white min-w-[40px] text-right">${val}${cfg.unit}</span>
+      </div>
+    </div>
+    <input type="range" id="${cfg.id}" min="${cfg.min}" max="${cfg.max}" step="${cfg.step || 1}" value="${val}"
+      class="w-full" oninput="onSliderChange('${cfg.id}',this.value)" />
+  `;
+  container.appendChild(div);
+  updateSliderSeverity(cfg.id, val, cfg);
+}
+
+function buildSliders() {
+  const envC = document.getElementById('envInputs');
+  const geoC = document.getElementById('geoInputs');
+  const riskC = document.getElementById('riskInputs');
+
+  ENV_SLIDERS.forEach(c => buildSlider(c, envC));
+
+  // Geo fields
+  GEO_FIELDS.forEach(cfg => {
+    const div = document.createElement('div');
+    div.style.background = 'rgba(15,26,13,0.3)';
+    div.style.borderRadius = '8px';
+    div.style.padding = '8px 12px';
+    div.style.border = '1px solid rgba(5,150,105,0.15)';
+
+    if (cfg.type === 'select') {
+      div.innerHTML = `
+        <label class="block text-xs text-slate-500 mb-1.5 font-500">${cfg.label}</label>
+        <select id="${cfg.id}" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500" onchange="calcLiveESG()">
+          ${cfg.options.map(o => `<option>${o}</option>`).join('')}
+        </select>`;
+    } else {
+      const val = cfg.val !== undefined ? cfg.val : ((cfg.min + cfg.max) / 2);
+      div.innerHTML = `
+        <div class="flex justify-between items-center mb-1.5">
+          <label class="text-xs text-slate-500 font-500">${cfg.label}</label>
+          <span id="disp_${cfg.id}" class="text-xs text-white font-600">${val}${cfg.unit}</span>
+        </div>
+        <input type="range" id="${cfg.id}" min="${cfg.min}" max="${cfg.max}" step="${cfg.step||1}" value="${val}" class="w-full" oninput="onSliderChange('${cfg.id}',this.value)" />`;
+    }
+    geoC.appendChild(div);
+  });
+
+  RISK_FIELDS.forEach(cfg => {
+    const div = document.createElement('div');
+    div.id = `wrap_${cfg.id}`;
+    const val = cfg.val !== undefined ? cfg.val : ((cfg.min + cfg.max) / 2);
+    div.style.cssText = `border:1px solid ${SEV_BORDER.green};border-radius:8px;padding:8px 12px;background:rgba(15,26,13,0.3);transition:border-color 0.3s`;
+    div.innerHTML = `
+      <div class="flex justify-between items-center mb-1.5">
+        <label class="text-xs text-slate-400 font-500">${cfg.label}</label>
+        <div class="flex items-center gap-1.5">
+          <span id="sev_${cfg.id}" class="text-xs px-1.5 py-0.5 rounded font-500" style="background:rgba(5,150,105,0.2);color:#34d399">${SEV_LABEL.green}</span>
+          <span id="disp_${cfg.id}" class="text-xs font-600 text-white">${val}${cfg.unit}</span>
+        </div>
+      </div>
+      <input type="range" id="${cfg.id}" min="${cfg.min}" max="${cfg.max}" step="${cfg.step||1}" value="${val}" class="w-full" oninput="onSliderChange('${cfg.id}',this.value)" />`;
+    riskC.appendChild(div);
+    updateSliderSeverity(cfg.id, val, cfg);
+  });
+}
+
+function updateSliderSeverity(id, val, cfg) {
+  const sev = getSeverity(cfg, val);
+  const wrap = document.getElementById(`wrap_${id}`);
+  const badge = document.getElementById(`sev_${id}`);
+  if (wrap) wrap.style.borderColor = SEV_BORDER[sev];
+  if (badge) {
+    const colors = {
+      green: 'background:rgba(5,150,105,0.2);color:#34d399',
+      yellow: 'background:rgba(245,158,11,0.2);color:#fbbf24',
+      red: 'background:rgba(239,68,68,0.2);color:#f87171',
+    };
+    badge.style.cssText = colors[sev];
+    badge.textContent = SEV_LABEL[sev];
+  }
+  // Update slider thumb color
+  const slider = document.getElementById(id);
+  if (slider) {
+    slider.className = `w-full ${sev !== 'green' ? sev : ''}`;
+  }
+}
+
+function onSliderChange(id, val) {
+  const disp = document.getElementById(`disp_${id}`);
+  const cfg = [...ENV_SLIDERS, ...GEO_FIELDS, ...RISK_FIELDS].find(c => c.id === id);
+  if (disp && cfg) {
+    disp.textContent = `${parseFloat(val)}${cfg.unit || ''}`;
+    updateSliderSeverity(id, val, cfg);
+  }
+  calcLiveESG();
+  updateSimPreview();
+}
+
+// ─────────────────────────────────────────────
+// PRESETS
+// ─────────────────────────────────────────────
+const PRESETS = {
+  arid: { soilPH:7.8, rainfall:200, avgTemp:38, aqi:120, humidity:15, groundwater:60, windSpeed:35, greenCover:8, biodiversity:20, waterQuality:25, noise:40, carbonEmission:80, wasteEfficiency:40, renewableEnergy:20, floodProb:5, heatwaveFreq:15, wildfireRisk:65, droughtSeverity:8.5, soilFertility:20, climateResilience:22, elevation:300, distWater:180, popDensity:50, urbanRate:15, climateZone:'Arid' },
+  urban: { soilPH:6.0, rainfall:600, avgTemp:32, aqi:220, humidity:45, groundwater:30, windSpeed:12, greenCover:12, biodiversity:15, waterQuality:40, noise:95, carbonEmission:420, wasteEfficiency:55, renewableEnergy:12, floodProb:35, heatwaveFreq:12, wildfireRisk:10, droughtSeverity:4, soilFertility:15, climateResilience:30, elevation:20, distWater:5, popDensity:18000, urbanRate:92, climateZone:'Temperate' },
+  industrial: { soilPH:4.5, rainfall:700, avgTemp:26, aqi:320, humidity:50, groundwater:40, windSpeed:18, greenCover:6, biodiversity:10, waterQuality:20, noise:105, carbonEmission:490, wasteEfficiency:30, renewableEnergy:8, floodProb:25, heatwaveFreq:8, wildfireRisk:20, droughtSeverity:5, soilFertility:10, climateResilience:18, elevation:50, distWater:10, popDensity:5000, urbanRate:80, climateZone:'Temperate' },
+  coastal: { soilPH:7.2, rainfall:1400, avgTemp:24, aqi:30, humidity:78, groundwater:5, windSpeed:25, greenCover:60, biodiversity:75, waterQuality:85, noise:35, carbonEmission:40, wasteEfficiency:78, renewableEnergy:55, floodProb:60, heatwaveFreq:4, wildfireRisk:8, droughtSeverity:1.5, soilFertility:65, climateResilience:65, elevation:5, distWater:0, popDensity:400, urbanRate:20, climateZone:'Tropical' },
+  tropical: { soilPH:6.2, rainfall:2400, avgTemp:27, aqi:20, humidity:88, groundwater:8, windSpeed:12, greenCover:82, biodiversity:92, waterQuality:90, noise:30, carbonEmission:25, wasteEfficiency:60, renewableEnergy:45, floodProb:40, heatwaveFreq:2, wildfireRisk:5, droughtSeverity:0.5, soilFertility:80, climateResilience:70, elevation:80, distWater:3, popDensity:150, urbanRate:10, climateZone:'Tropical' },
+};
+
+let activePreset = null;
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+  activePreset = name;
+  document.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+  event.target.classList.add('active');
+
+  Object.entries(p).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') {
+      for (let i = 0; i < el.options.length; i++) {
+        if (el.options[i].text === val) { el.selectedIndex = i; break; }
+      }
+    } else {
+      el.value = val;
+      const cfg = [...ENV_SLIDERS, ...GEO_FIELDS, ...RISK_FIELDS].find(c => c.id === id);
+      if (cfg) {
+        const disp = document.getElementById(`disp_${id}`);
+        if (disp) disp.textContent = `${val}${cfg.unit || ''}`;
+        updateSliderSeverity(id, val, cfg);
+      }
+    }
+  });
+  calcLiveESG();
+}
+
+// ─────────────────────────────────────────────
+// LIVE ESG SCORE CALCULATOR
+// ─────────────────────────────────────────────
+function getVal(id) { const e = document.getElementById(id); return e ? parseFloat(e.value) : 0; }
+
+function calcLiveESG() {
+  const aqi = getVal('aqi');
+  const greenCover = getVal('greenCover');
+  const biodiversity = getVal('biodiversity');
+  const waterQuality = getVal('waterQuality');
+  const carbonEmission = getVal('carbonEmission');
+  const renewableEnergy = getVal('renewableEnergy');
+  const wasteEfficiency = getVal('wasteEfficiency');
+  const climateResilience = getVal('climateResilience');
+  const soilFertility = getVal('soilFertility');
+  const noise = getVal('noise');
+  const floodProb = getVal('floodProb');
+  const wildfireRisk = getVal('wildfireRisk');
+  const humidity = getVal('humidity');
+  const rainfall = getVal('rainfall');
+
+  // Weighted scoring model
+  let score = 0;
+  score += (1 - Math.min(aqi / 300, 1)) * 15;          // AQI (lower better)
+  score += (greenCover / 100) * 12;                       // green cover
+  score += (biodiversity / 100) * 10;                     // biodiversity
+  score += (waterQuality / 100) * 10;                     // water quality
+  score += (1 - Math.min(carbonEmission / 400, 1)) * 12; // carbon (lower better)
+  score += (renewableEnergy / 100) * 10;                  // renewables
+  score += (wasteEfficiency / 100) * 8;                   // waste
+  score += (climateResilience / 100) * 8;                 // resilience
+  score += (soilFertility / 100) * 6;                     // soil
+  score += (1 - Math.min((noise - 20) / 80, 1)) * 4;    // noise
+  score += (1 - floodProb / 100) * 3;                    // flood
+  score += (1 - wildfireRisk / 100) * 2;                 // wildfire
+  const rainNorm = Math.min(rainfall / 1500, 1); score += rainNorm * 3;
+  const humNorm = Math.abs(humidity - 55) / 55; score += (1 - humNorm) * 2;
+
+  // Apply sim deltas
+  const { aqi: aqiD, greenCover: gcD } = state.simDeltas;
+  const aqiAdj = Math.max(0, aqi * (1 + aqiD / 100));
+  const gcAdj = Math.max(0, Math.min(100, greenCover + gcD));
+  score -= (aqiD > 0 ? (aqiAdj - aqi) / 300 * 15 : 0);
+  score += (gcAdj - greenCover) / 100 * 12;
+
+  score = Math.round(Math.max(0, Math.min(100, score)));
+
+  const badge = document.getElementById('liveScoreVal');
+  const chip = document.getElementById('liveScoreBadgeChip');
+  badge.textContent = score;
+  chip.classList.remove('hidden');
+
+  let tier, chipStyle;
+  if (score >= 70) { tier = 'ESG Compliant'; chipStyle = 'badge-green'; }
+  else if (score >= 45) { tier = 'At Risk'; chipStyle = 'badge-yellow'; }
+  else { tier = 'Critical'; chipStyle = 'badge-red'; }
+  chip.textContent = tier;
+  chip.className = `metric-chip ${chipStyle} text-xs`;
+
+  return score;
+}
+
+// ─────────────────────────────────────────────
+// PREDICTIVE SIMULATOR
+// ─────────────────────────────────────────────
+const SIM_CONTROLS = [
+  { id: 'simAQI', label: 'AQI change in 5 yrs', key: 'aqi', min: -80, max: 150, val: 0, unit: '%', hint: 'Worsens/improves AQI by %' },
+  { id: 'simGC', label: '+/- Green Cover target', key: 'greenCover', min: -40, max: 60, val: 0, unit: 'pp', hint: 'Add or remove green cover %' },
+  { id: 'simTemp', label: 'Temperature shift', key: 'temperature', min: -5, max: 10, val: 0, unit: '°C', hint: 'Projected temperature change' },
+  { id: 'simRain', label: 'Rainfall change', key: 'rainfall', min: -60, max: 60, val: 0, unit: '%', hint: 'Change in annual rainfall' },
+];
+
+function buildSimulator() {
+  const panel = document.getElementById('simulatorPanel');
+  SIM_CONTROLS.forEach(cfg => {
+    const div = document.createElement('div');
+    div.className = 'sim-row';
+    div.innerHTML = `
+      <div class="flex items-center justify-between mb-1.5">
+        <span class="text-xs text-slate-400 font-500">${cfg.label}</span>
+        <span id="simDisp_${cfg.id}" class="text-xs font-700 text-white">${cfg.val > 0 ? '+' : ''}${cfg.val}${cfg.unit}</span>
+      </div>
+      <input type="range" id="${cfg.id}" min="${cfg.min}" max="${cfg.max}" step="1" value="${cfg.val}" class="w-full"
+        oninput="onSimChange('${cfg.id}','${cfg.key}',this.value,'${cfg.unit}')" />
+      <p class="text-xs text-slate-600 mt-1">${cfg.hint}</p>`;
+    panel.appendChild(div);
+  });
+}
+
+function onSimChange(id, key, val, unit) {
+  const numVal = parseFloat(val);
+  state.simDeltas[key] = numVal;
+  const disp = document.getElementById(`simDisp_${id}`);
+  if (disp) disp.textContent = `${numVal > 0 ? '+' : ''}${numVal}${unit}`;
+  updateSimPreview();
+  calcLiveESG();
+}
+
+function updateSimPreview() {
+  const label = document.getElementById('simDeltaLabel');
+  const badges = document.getElementById('simDeltaBadges');
+  const { aqi, greenCover, temperature, rainfall } = state.simDeltas;
+  const parts = [];
+  if (aqi !== 0) parts.push({ text: `AQI ${aqi > 0 ? '+' : ''}${aqi}%`, neg: aqi > 0 });
+  if (greenCover !== 0) parts.push({ text: `Green Cover ${greenCover > 0 ? '+' : ''}${greenCover}pp`, neg: greenCover < 0 });
+  if (temperature !== 0) parts.push({ text: `Temp ${temperature > 0 ? '+' : ''}${temperature}°C`, neg: temperature > 0 });
+  if (rainfall !== 0) parts.push({ text: `Rainfall ${rainfall > 0 ? '+' : ''}${rainfall}%`, neg: rainfall < 0 });
+
+  if (parts.length === 0) {
+    label.textContent = 'Adjust sliders above to preview macro-shift impact';
+    badges.innerHTML = '';
+  } else {
+    label.textContent = '5-Year Scenario Active:';
+    badges.innerHTML = parts.map(p => `<span class="metric-chip ${p.neg ? 'badge-red' : 'badge-green'} text-xs">${p.text}</span>`).join('');
+  }
+}
+
+function resetSimulator() {
+  SIM_CONTROLS.forEach(cfg => {
+    state.simDeltas[cfg.key] = 0;
+    const el = document.getElementById(cfg.id);
+    if (el) el.value = 0;
+    const disp = document.getElementById(`simDisp_${cfg.id}`);
+    if (disp) disp.textContent = `0${cfg.unit}`;
+  });
+  updateSimPreview();
+  calcLiveESG();
+}
+
+// ─────────────────────────────────────────────
+// SETTINGS MODAL
+// ─────────────────────────────────────────────
+function openModal() {
+  document.getElementById('settingsModal').classList.add('open');
+  // Restore saved values
+  const orKey = document.getElementById('or-key');
+  const orModel = document.getElementById('or-model');
+  const sbUrl = document.getElementById('sb-url');
+  const sbAnon = document.getElementById('sb-anon');
+  if (orKey) orKey.value = state.orKey;
+  if (orModel) orModel.value = state.orModel;
+  if (sbUrl) sbUrl.value = state.sbUrl;
+  if (sbAnon) sbAnon.value = state.sbAnon;
+  // Activate current mode tab
+  document.querySelectorAll('.tab-btn').forEach(b => { if (b.dataset.mode === state.mode) b.click(); });
+}
+function closeModal() { document.getElementById('settingsModal').classList.remove('open'); }
+
+function switchMode(mode, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('active');
+    b.classList.add('text-slate-400');
+  });
+  btn.classList.add('active');
+  btn.classList.remove('text-slate-400');
+  document.querySelectorAll('.mode-panel').forEach(p => p.classList.add('hidden'));
+  document.getElementById(`panel-${mode}`).classList.remove('hidden');
+  state.mode = mode;
+}
+
+function saveSettings() {
+  state.orKey = document.getElementById('or-key')?.value || '';
+  state.orModel = document.getElementById('or-model')?.value || 'anthropic/claude-3-haiku';
+  state.sbUrl = document.getElementById('sb-url')?.value || '';
+  state.sbAnon = document.getElementById('sb-anon')?.value || '';
+  localStorage.setItem('esg_mode', state.mode);
+  localStorage.setItem('esg_or_key', state.orKey);
+  localStorage.setItem('esg_or_model', state.orModel);
+  localStorage.setItem('esg_sb_url', state.sbUrl);
+  localStorage.setItem('esg_sb_anon', state.sbAnon);
+  updateModeIndicator();
+}
+
+function updateModeIndicator() {
+  const labels = { local: 'Local Sim', openrouter: 'OpenRouter', supabase: 'Supabase' };
+  document.getElementById('modeIndicatorText').textContent = labels[state.mode] || 'Local Sim';
+}
+
+// ─────────────────────────────────────────────
+// COLLECT ENV DATA
+// ─────────────────────────────────────────────
+function collectEnvData() {
+  const data = {};
+  [...ENV_SLIDERS, ...GEO_FIELDS.filter(c => c.type !== 'select'), ...RISK_FIELDS].forEach(cfg => {
+    const el = document.getElementById(cfg.id);
+    if (el) data[cfg.id] = parseFloat(el.value);
+  });
+  GEO_FIELDS.filter(c => c.type === 'select').forEach(cfg => {
+    const el = document.getElementById(cfg.id);
+    if (el) data[cfg.id] = el.options[el.selectedIndex].text;
+  });
+  data.simulatorDeltas = { ...state.simDeltas };
+  data.currentESGScore = calcLiveESG();
+  return data;
+}
+
+// ─────────────────────────────────────────────
+// MAIN ANALYSIS TRIGGER
+// ─────────────────────────────────────────────
+async function triggerESGAnalysis() {
+  const btn = document.getElementById('generateBtn');
+  const statusEl = document.getElementById('generateStatus');
+  const statusText = document.getElementById('generateStatusText');
+  btn.disabled = true;
+  btn.innerHTML = `<svg class="spinner w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Analyzing…`;
+  statusEl.classList.remove('hidden');
+  statusEl.classList.add('flex');
+
+  const envData = collectEnvData();
+
+  const phases = [
+    'Analyzing environmental parameters…',
+    'Cross-referencing climate models…',
+    'Generating botanical proposals…',
+    'Building infrastructure solutions…',
+    'Compiling ESG projections…',
+  ];
+  let phaseIdx = 0;
+  const phaseInterval = setInterval(() => {
+    phaseIdx = (phaseIdx + 1) % phases.length;
+    statusText.textContent = phases[phaseIdx];
+  }, 1200);
+
+  let result;
+  try {
+    if (state.mode === 'local') {
+      await new Promise(r => setTimeout(r, 2200)); // Simulate processing
+      result = localSimulationEngine(envData);
+    } else if (state.mode === 'openrouter') {
+      result = await callOpenRouter(envData);
+    } else {
+      result = await callSupabase(envData);
+    }
+    clearInterval(phaseInterval);
+    renderResults(result, envData);
+  } catch (err) {
+    clearInterval(phaseInterval);
+    statusText.textContent = `Error: ${err.message}. Falling back to local simulation…`;
+    await new Promise(r => setTimeout(r, 1200));
+    result = localSimulationEngine(envData);
+    renderResults(result, envData);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<i data-lucide="cpu" class="w-5 h-5"></i> Regenerate Analysis <span class="ml-1">↻</span>`;
+    lucide.createIcons();
+    statusEl.classList.add('hidden');
+    statusEl.classList.remove('flex');
+  }
+}
+
+// ─────────────────────────────────────────────
+// OPENROUTER API
+// ─────────────────────────────────────────────
+async function callOpenRouter(envData) {
+  if (!state.orKey) throw new Error('No OpenRouter API key configured. Open Settings to add one.');
+  const prompt = buildLLMPrompt(envData);
+  const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${state.orKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: state.orModel || 'anthropic/claude-3-haiku',
+      messages: [
+        { role: 'system', content: 'You are an expert ESG analyst. Always respond with ONLY a valid JSON object, no markdown, no explanation.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 2048,
+    }),
+  });
+  if (!resp.ok) throw new Error(`OpenRouter error ${resp.status}`);
+  const data = await resp.json();
+  const text = data.choices?.[0]?.message?.content || '';
+  return parseJSON(text);
+}
+
+// ─────────────────────────────────────────────
+// SUPABASE EDGE FUNCTION
+// ─────────────────────────────────────────────
+async function callSupabase(envData) {
+  if (!state.sbUrl) throw new Error('No Supabase Edge Function URL configured. Open Settings.');
+  const resp = await fetch(state.sbUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${state.sbAnon}`,
+    },
+    body: JSON.stringify({ environmentalData: envData }),
+  });
+  if (!resp.ok) throw new Error(`Supabase error ${resp.status}`);
+  return await resp.json();
+}
+
+function buildLLMPrompt(envData) {
+  return `You are an expert ESG analyst and botanist. Analyze these environmental parameters and return ONLY a JSON object matching this exact schema (no markdown, no preamble):
+{
+  "summary": "2-3 sentence executive summary of the land asset's environmental health and key concerns",
+  "tree_recommendations": [
+    { "species": "species name", "reason": "ecological justification", "co2_absorbed_per_year_kg": 45 }
+  ],
+  "infrastructure_solutions": [
+    { "type": "Water|Carbon|Cooling|Energy|Biodiversity", "solution": "detailed solution description" }
+  ],
+  "vulnerability_score": 65,
+  "projected_improvement_score": 78
+}
+
+Environmental Data: ${JSON.stringify(envData)}
+
+Return 4-6 tree species and 4-6 infrastructure solutions appropriate for the ecosystem. vulnerability_score and projected_improvement_score are 0-100. Return ONLY valid JSON.`;
+}
+
+function parseJSON(text) {
+  let clean = text.trim();
+  clean = clean.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+  const start = clean.indexOf('{');
+  const end = clean.lastIndexOf('}');
+  if (start !== -1 && end !== -1) clean = clean.slice(start, end + 1);
+  return JSON.parse(clean);
+}
+
+// ─────────────────────────────────────────────
+// LOCAL SIMULATION ENGINE
+// ─────────────────────────────────────────────
+function localSimulationEngine(envData) {
+  const { aqi, greenCover, carbonEmission, rainfall, avgTemp, biodiversity, waterQuality, soilFertility, climateResilience, wasteEfficiency, renewableEnergy, floodProb, wildfireRisk, droughtSeverity, soilPH, humidity, groundwater, urbanRate, popDensity } = envData;
+  const score = envData.currentESGScore || calcLiveESG();
+
+  // Determine ecosystem type
+  let ecosystem = 'temperate';
+  if (rainfall < 300 && avgTemp > 30) ecosystem = 'arid';
+  else if (aqi > 200 || carbonEmission > 300) ecosystem = 'industrial-urban';
+  else if (urbanRate > 70) ecosystem = 'urban';
+  else if (rainfall > 2000) ecosystem = 'tropical';
+  else if (floodProb > 40 && humidity > 70) ecosystem = 'coastal-wetland';
+
+  const TREES = {
+    arid: [
+      { species: 'Prosopis cineraria (Ghaf Tree)', reason: 'Extremely drought-tolerant nitrogen-fixer that stabilizes sandy soils, provides shade for understory vegetation, and survives 55°C+ temperatures. Thrives in hyper-arid environments with deep root system.', co2_absorbed_per_year_kg: 22 },
+      { species: 'Acacia tortilis (Umbrella Thorn)', reason: 'Pioneer species for desertified zones. Fixes atmospheric nitrogen, prevents wind erosion, supports local fauna. Tolerates saline and alkaline soils effectively.', co2_absorbed_per_year_kg: 18 },
+      { species: 'Ziziphus spina-christi (Christ\'s Thorn Jujube)', reason: 'Deep-rooted drought-survivor that anchors dune systems. Provides canopy cover to reduce soil surface temperature by 8–12°C, enabling understory colonization.', co2_absorbed_per_year_kg: 15 },
+      { species: 'Calotropis procera (Apple of Sodom)', reason: 'Pioneer scrub that colonizes barren soils, protecting from wind erosion and providing biomass. Fast-growing with moderate drought tolerance.', co2_absorbed_per_year_kg: 12 },
+      { species: 'Salvadora persica (Toothbrush Tree)', reason: 'Halophyte species tolerant of saline groundwater. Stabilizes riparian margins, provides ecosystem connectivity, and survives up to 45°C ambient temperatures.', co2_absorbed_per_year_kg: 10 },
+    ],
+    'industrial-urban': [
+      { species: 'Platanus × acerifolia (London Plane)', reason: 'Industrial-grade air pollutant absorber. Bark shedding mechanism removes particulate matter. Tolerates compacted urban soils. Proven to reduce airborne PM2.5 by up to 23% in dense urban corridors.', co2_absorbed_per_year_kg: 48 },
+      { species: 'Ailanthus altissima (Tree of Heaven)', reason: 'Extreme pollution-tolerant pioneer tree proven to survive AQI > 400 environments. Rapidly sequesters carbon in contaminated urban soils with minimal resource input.', co2_absorbed_per_year_kg: 35 },
+      { species: 'Ginkgo biloba (Maidenhair Tree)', reason: 'Exceptional resistance to ozone, sulfur dioxide, and particulate pollution. Produces antioxidant compounds that neutralize urban air toxins. Millennia-proven urban survivor.', co2_absorbed_per_year_kg: 42 },
+      { species: 'Robinia pseudoacacia (Black Locust)', reason: 'Nitrogen-fixing powerhouse that reclaims industrial brownfields. Fast 1.5m/year growth rate ensures rapid carbon sequestration. Excellent for contaminated land phytoremediation.', co2_absorbed_per_year_kg: 55 },
+      { species: 'Tilia × europaea (Common Lime)', reason: 'Proven urban heat island mitigator. Provides 40% more cooling than standard tree coverage through transpirational cooling. Nectar source restores urban pollinator populations.', co2_absorbed_per_year_kg: 44 },
+      { species: 'Metasequoia glyptostroboides (Dawn Redwood)', reason: 'Fast-growing deciduous conifer achieving 60+ kg CO₂/year in optimal conditions. Highly adaptable to waterlogged, compacted, and polluted urban soils.', co2_absorbed_per_year_kg: 62 },
+    ],
+    urban: [
+      { species: 'Quercus ilex (Holm Oak)', reason: 'Evergreen canopy anchor for urban heat island mitigation. Provides year-round shade, supports 200+ invertebrate species, and demonstrates high ozone and dust resistance.', co2_absorbed_per_year_kg: 45 },
+      { species: 'Tilia cordata (Small-leaved Lime)', reason: 'Premium urban cooling tree reducing ambient temperature by 4–6°C within 20m radius. High transpiration rate and large leaf area index make it the gold standard for urban greening programs.', co2_absorbed_per_year_kg: 42 },
+      { species: 'Acer campestre (Field Maple)', reason: 'Compact urban-tolerant species ideal for street tree planting. Excellent air particulate capture, autumn visual biodiversity contribution, tolerates road salt and compacted soils.', co2_absorbed_per_year_kg: 28 },
+      { species: 'Alnus glutinosa (Common Alder)', reason: 'Riparian specialist ideal for urban drainage corridors. Nitrogen fixer that enriches degraded urban soils. Root system critical for stream bank stabilization and urban flood attenuation.', co2_absorbed_per_year_kg: 35 },
+      { species: 'Sorbus aria (Whitebeam)', reason: 'Compact ornamental that thrives in alkaline, chalk soils typical of urban construction backfill. Provides bird food source extending urban food web. Tolerates coastal exposure.', co2_absorbed_per_year_kg: 22 },
+    ],
+    tropical: [
+      { species: 'Shorea robusta (Sal Tree)', reason: 'Climax tropical species forming high-canopy forest structure. Exceptional carbon density at 85kg CO₂/year. Critical habitat for biodiversity recolonization and soil moisture retention.', co2_absorbed_per_year_kg: 85 },
+      { species: 'Tectona grandis (Teak)', reason: 'High-value carbon sequestration timber species. Produces dense wood biomass with long-term carbon lock-in. Supports sustainable forestry economics for ESG investment justification.', co2_absorbed_per_year_kg: 65 },
+      { species: 'Bambusa bambos (Giant Bamboo)', reason: 'Highest-volume carbon sequester available — up to 12 tonnes CO₂/hectare/year. Rapid colonizer of degraded tropical soils. Watershed protection through extensive root mats.', co2_absorbed_per_year_kg: 120 },
+      { species: 'Ficus benghalensis (Banyan Tree)', reason: 'Ecosystem engineer that expands canopy cover via aerial roots. Single mature specimen can shade 1 hectare. Temperature reduction of 6–9°C beneath canopy. Sacred biodiversity hub.', co2_absorbed_per_year_kg: 75 },
+      { species: 'Swietenia macrophylla (Mahogany)', reason: 'High-density tropical timber with exceptional long-term carbon storage. ESG-certified reforestation species recognised under REDD+ carbon credit frameworks.', co2_absorbed_per_year_kg: 58 },
+    ],
+    'coastal-wetland': [
+      { species: 'Rhizophora mangle (Red Mangrove)', reason: 'Blue carbon champion sequestering 5× more carbon per hectare than tropical rainforest. Provides coastal protection against 75% of storm surge energy. Critical fish nursery habitat.', co2_absorbed_per_year_kg: 95 },
+      { species: 'Avicennia marina (Grey Mangrove)', reason: 'Salt-tolerant pioneer mangrove stabilizing coastal erosion. Pneumatophores oxygenate anoxic sediments, unlocking soil carbon capture mechanisms.', co2_absorbed_per_year_kg: 80 },
+      { species: 'Casuarina equisetifolia (Coastal Sheoak)', reason: 'Coastal windbreak species reducing wind erosion and saltwater intrusion. Nitrogen-fixer that establishes functional soil ecology on saline, infertile coastal soils.', co2_absorbed_per_year_kg: 35 },
+      { species: 'Nypa fruticans (Nipa Palm)', reason: 'Estuarine palm forming dense tidal wetland communities. Exceptional blue carbon storage in below-ground root mass. Provides sustainable non-timber forest products.', co2_absorbed_per_year_kg: 45 },
+    ],
+    temperate: [
+      { species: 'Quercus robur (English Oak)', reason: 'Keystone species supporting 2,300+ associated organisms. Long-lived carbon sink with 200+ year sequestration lifecycle. Acorn mast provides critical wildlife food source for ecosystem recovery.', co2_absorbed_per_year_kg: 48 },
+      { species: 'Betula pendula (Silver Birch)', reason: 'Pioneer nurse tree accelerating forest succession. Creates sheltered microhabitat enabling slower-establishing species to colonize. Mycorrhizal networks support entire woodland ecosystem.', co2_absorbed_per_year_kg: 30 },
+      { species: 'Fraxinus excelsior (Common Ash)', reason: 'High-canopy forest forming species with exceptional water use regulation. Root system critical for slope stability and soil structure maintenance on agricultural land margins.', co2_absorbed_per_year_kg: 38 },
+      { species: 'Acer pseudoplatanus (Sycamore)', reason: 'Fast-establishing wind-resistant species ideal for degraded temperate landscapes. Provides rapid ESG carbon accounting returns within 10-year reporting cycles.', co2_absorbed_per_year_kg: 40 },
+      { species: 'Carpinus betulus (Hornbeam)', reason: 'Shade-tolerant understory species completing multi-tier forest structure. Supports woodland biodiversity by providing dense habitat. Exceptional biomass carbon density.', co2_absorbed_per_year_kg: 25 },
+      { species: 'Alnus incana (Grey Alder)', reason: 'Nitrogen-fixing riparian specialist. Ideal for revegetating degraded stream corridors and waterlogged areas. Leaf litter nutrient cycling improves soil health scores within 3 years.', co2_absorbed_per_year_kg: 32 },
+    ],
+  };
+
+  const INFRA = {
+    arid: [
+      { type: 'Water', solution: 'Fog Collection Arrays: Deploy atmospheric water harvesting nets across ridge systems to capture 15–40 litres/m²/day in coastal desert zones. Combine with subsurface cisterns and drip distribution for afforestation plots without groundwater dependency.' },
+      { type: 'Carbon', solution: 'Biochar Soil Amendment Programme: Convert agricultural waste biomass to biochar via pyrolysis, sequestering carbon for 1,000+ years while improving water retention by 40% in sandy soils. Target 50 tonnes of biochar per hectare of restoration area.' },
+      { type: 'Cooling', solution: 'Reflective Ground Cover & Shade Sails: Deploy high-albedo gravel mulch and engineered shade structures over initial planting areas, reducing soil surface temperature from 65°C to 35°C, enabling seedling survival in the first critical establishment phase.' },
+      { type: 'Water', solution: 'Contour Earthworks (Zai Pits & Half-Moons): Construct 30,000–50,000 zai pit micro-catchments per hectare to concentrate rainfall runoff into root zones. Traditional Sahelian technique proven to enable reforestation in 150mm rainfall zones.' },
+      { type: 'Energy', solution: 'Agrivoltaic Solar Canopy: Deploy bifacial solar panels at 2m height over restoration plots, generating renewable energy while reducing solar radiation load on soil by 60%, cutting evapotranspiration loss and enabling plant establishment.' },
+    ],
+    'industrial-urban': [
+      { type: 'Carbon', solution: 'Urban Carbon Capture Facade Systems: Install modular bioreactor panels containing concentrated microalgae on industrial building facades, capturing CO₂ at 10-50× the rate of trees per unit area. Algae biomass harvested as biofuel feedstock completing the carbon cycle.' },
+      { type: 'Water', solution: 'Industrial Stormwater Bioswale Network: Engineer 15km of vegetated bioswales along industrial corridors, removing 85% of heavy metal pollutants, nitrogen, and phosphorus from runoff before watershed entry. Integrated with constructed wetland polishing ponds.' },
+      { type: 'Cooling', solution: 'District Cool Roof Initiative: Mandate high-albedo white or green roofing across 60% of industrial building stock. Combined effect reduces urban heat island intensity by 2–3°C across the entire industrial zone, cutting cooling energy demand 25%.' },
+      { type: 'Carbon', solution: 'Carbon-Negative Concrete Replacement: Specify geopolymer concrete (80% lower embodied carbon) and hempcrete for all new industrial construction and major refurbishments. Estimated 12,000 tonnes CO₂e savings per 100,000m² of construction activity.' },
+      { type: 'Energy', solution: 'Waste-to-Energy Plasma Gasification: Install plasma arc gasification facility processing 200 tonnes/day of industrial and municipal solid waste at 10,000°C+, achieving 99.9% waste diversion from landfill and generating net 8MW of clean baseload electricity.' },
+      { type: 'Biodiversity', solution: 'Industrial Biodiversity Corridor Masterplan: Designate and actively rewild a 300m-wide ecological corridor through the industrial zone connecting fragmented habitat patches, using native species from local ecotype seed banks to restore functional food web connectivity.' },
+    ],
+    urban: [
+      { type: 'Cooling', solution: 'Green Corridor Urban Cooling Strategy: Design 12km connected linear park system linking existing green spaces, increasing urban tree canopy from current level to 25%+ within 10 years, achieving measurable 3°C ambient temperature reduction confirmed by thermal monitoring network.' },
+      { type: 'Water', solution: 'Sponge City Blue-Green Infrastructure: Retrofit 40% of hard-paved surfaces with permeable paving, bioretention rain gardens, and pocket parks with deep-rooted native vegetation, reducing peak stormwater runoff by 70% and replenishing urban aquifer.' },
+      { type: 'Biodiversity', solution: 'Rooftop Wildflower Meadow Programme: Mandate 30% green roof coverage on all new planning permissions over 1,000m² GIA. Native wildflower meadow specification increases urban pollinator populations by 200% within 5 years, supporting urban food production networks.' },
+      { type: 'Carbon', solution: 'Urban Canopy Carbon Registry: Establish city-wide individual tree carbon accounting using LiDAR-verified biomass measurement, creating tradeable urban carbon credits at £25-50/tonne, generating revenue stream to fund ongoing urban forestry management.' },
+      { type: 'Energy', solution: 'Integrated Urban Solar + Storage Network: Deploy community-owned solar carport arrays across municipal car parks combined with 50MWh battery storage, providing 30% of peak urban electricity demand from renewable sources with zero grid stress during heatwaves.' },
+    ],
+    tropical: [
+      { type: 'Biodiversity', solution: 'Assisted Natural Regeneration (ANR) Programme: Remove invasive species from 5,000 hectares and protect naturally regenerating native seedlings, achieving 80%+ canopy closure within 8 years at 10% of conventional replanting cost. IPCC-endorsed most biodiversity-rich reforestation method.' },
+      { type: 'Water', solution: 'Watershed Payment for Ecosystem Services (PES): Establish legal watershed protection zone protecting 50,000+ hectares of headwater forest, with downstream water utilities paying $30-80/hectare/year to forest communities for maintained infiltration and clean water delivery.' },
+      { type: 'Carbon', solution: 'REDD+ Carbon Credit Methodology: Register 10,000+ hectares under Verified Carbon Standard REDD+ avoiding deforestation protocol, generating $200-400/hectare/year in verified carbon credits while protecting existing above-ground carbon stocks of 150-300 tCO₂e/ha.' },
+      { type: 'Energy', solution: 'Community Biogas Digesters: Deploy 500-unit household biogas digester network converting organic waste to cooking fuel, eliminating 60% of cooking-related deforestation pressure. Each unit displaces 2 tonnes/year of fuelwood harvest, protecting 1.5 hectares of forest.' },
+      { type: 'Water', solution: 'Riparian Buffer Restoration: Establish mandatory 50m native riparian buffer along all waterways, reducing agricultural runoff by 75%, restoring fish breeding habitat, and creating continuous wildlife movement corridors across the landscape.' },
+    ],
+    'coastal-wetland': [
+      { type: 'Water', solution: 'Mangrove-Based Coastal Defense System: Restore 2,000 hectares of mangrove buffer zone seaward of critical coastal infrastructure, providing equivalent storm surge protection to a 2m concrete seawall at 2% of the construction cost, with increasing protection over time.' },
+      { type: 'Carbon', solution: 'Blue Carbon Credit Programme: Certify restored seagrass meadows and mangroves under Verra Blue Carbon Standard, generating 8-15 verified carbon credits per hectare per year. 1,000-hectare project generates $250,000–$375,000 annual carbon credit revenue at current market rates.' },
+      { type: 'Biodiversity', solution: 'Artificial Reef Structures: Deploy 500 units of locally-cast concrete reef modules in 3-8m water depth, creating 15 hectares of structured fish habitat, increasing local fish biomass 400% within 5 years and restoring recreational fishing economics for coastal communities.' },
+      { type: 'Water', solution: 'Tidal Freshwater Wetland Creation: Engineer 200-hectare tidal freshwater wetland at estuary head to provide combined flood storage (reducing peak flood levels 0.8m), water quality polishing (removing 95% of agricultural phosphorus), and priority biodiversity habitat.' },
+    ],
+    temperate: [
+      { type: 'Biodiversity', solution: 'Rewilding Keystone Species Reintroduction: Reintroduce ecosystem engineers (beaver, white-tailed eagle, wild boar) to catalyse natural ecosystem restoration across 2,000+ hectares. Beaver dam networks proven to increase water retention 40%, reduce downstream flood peaks, and raise water tables, enabling natural woodland regeneration.' },
+      { type: 'Water', solution: 'Natural Flood Management (NFM) Landscape Programme: Deploy 150 leaky woody debris dams, 40 peat bog restoration areas, and 80 hectares of floodplain reconnection to reduce downstream peak flood flows by 30%, improving Climate Resilience Score from current level by 25 points over 5 years.' },
+      { type: 'Carbon', solution: 'Peatland Restoration Carbon Project: Restore 500 hectares of degraded upland peat bog through drain-blocking and Sphagnum reseeding, switching from 2 tCO₂e/ha/year emission to 0.8 tCO₂e/ha/year sequestration — a 2.8 tonne/ha/year improvement generating verified carbon credits.' },
+      { type: 'Energy', solution: 'Farm-Scale Anaerobic Digestion Network: Establish cooperative AD network processing 25,000 tonnes/year of agricultural slurry and food waste, generating 3.5MW continuous renewable electricity while producing high-quality biofertiliser, eliminating synthetic nitrogen fertilizer application over 800 hectares.' },
+      { type: 'Cooling', solution: 'Agroforestry Integration Programme: Introduce silvopastoral tree rows at 10m spacing across 1,500 hectares of farmland, reducing livestock heat stress (improving welfare and productivity), sequestering 2.5 tCO₂e/ha/year, and providing 20% wind speed reduction protecting soil from erosion.' },
+    ],
+  };
+
+  const trees = (TREES[ecosystem] || TREES.temperate).slice(0, 5);
+  const infra = (INFRA[ecosystem] || INFRA.temperate).slice(0, 5);
+
+  // Generate smart summary
+  const criticals = [];
+  if (aqi > 150) criticals.push('dangerously elevated air quality (AQI ' + Math.round(aqi) + ')');
+  if (greenCover < 15) criticals.push('critically low green cover (' + Math.round(greenCover) + '%)');
+  if (carbonEmission > 200) criticals.push('high carbon emission density');
+  if (waterQuality < 35) criticals.push('poor water quality index (' + Math.round(waterQuality) + ')');
+  if (biodiversity < 25) criticals.push('near-critical biodiversity collapse');
+  if (droughtSeverity > 6) criticals.push('severe drought risk');
+
+  const vulnScore = Math.max(10, 100 - score);
+  const projScore = Math.min(95, score + 18 + Math.round(Math.random() * 8));
+
+  const ecosystemLabels = { arid: 'arid/desertified', 'industrial-urban': 'industrial-urban', urban: 'dense urban', tropical: 'tropical rainforest', 'coastal-wetland': 'coastal wetland', temperate: 'temperate lowland' };
+  const ecoLabel = ecosystemLabels[ecosystem];
+
+  const summary = criticals.length > 0
+    ? `This ${ecoLabel} land asset presents a composite ESG score of ${score}/100, with critical risk indicators including ${criticals.slice(0, 2).join(' and ')}. Immediate botanical and infrastructural intervention is required across ${Math.round(5 + Math.random() * 8)} priority domains to prevent irreversible ecological degradation. The proposed solutions project a ${projScore - score}-point ESG improvement over a 5-year horizon, with full investment payback estimated at 7-12 years under current carbon pricing mechanisms.`
+    : `This ${ecoLabel} land asset presents a composite ESG score of ${score}/100, indicating ${score >= 70 ? 'sound environmental health with targeted improvement opportunities' : 'moderate ecological stress requiring coordinated intervention'}. The strategic botanical and infrastructure proposals outlined below are projected to elevate the site's ESG performance to ${projScore}/100 within 5 years, generating measurable biodiversity, carbon sequestration, and climate resilience co-benefits aligned with TCFD and TNFD reporting frameworks.`;
+
+  return {
+    summary,
+    tree_recommendations: trees,
+    infrastructure_solutions: infra,
+    vulnerability_score: vulnScore,
+    projected_improvement_score: projScore,
+    ecosystem,
+  };
+}
+
+// ─────────────────────────────────────────────
+// RENDER RESULTS
+// ─────────────────────────────────────────────
+function renderResults(data, envData) {
+  const dashboard = document.getElementById('resultsDashboard');
+  dashboard.classList.remove('hidden');
+  dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Summary
+  document.getElementById('summaryText').textContent = data.summary;
+
+  // Summary metrics
+  const metrics = [
+    { label: 'Vulnerability', val: data.vulnerability_score, unit: '/100', chip: data.vulnerability_score > 50 ? 'badge-red' : 'badge-yellow' },
+    { label: 'Projected ESG', val: data.projected_improvement_score, unit: '/100', chip: 'badge-green' },
+    { label: 'Current ESG', val: envData.currentESGScore, unit: '/100', chip: envData.currentESGScore >= 70 ? 'badge-green' : envData.currentESGScore >= 45 ? 'badge-yellow' : 'badge-red' },
+    { label: 'Tree Species', val: data.tree_recommendations?.length || 0, unit: ' recommended', chip: 'badge-green' },
+  ];
+  document.getElementById('summaryMetrics').innerHTML = metrics.map(m =>
+    `<span class="metric-chip ${m.chip} text-xs">${m.label}: <strong>${m.val}</strong>${m.unit}</span>`
+  ).join('');
+
+  // Gauges
+  renderGauges(data, envData);
+
+  // Heatmap
+  renderHeatmap(envData);
+
+  // Chart
+  renderChart(data, envData);
+
+  // Trees
+  const treeCount = document.getElementById('treeCount');
+  treeCount.textContent = `${data.tree_recommendations?.length || 0} Species`;
+  document.getElementById('treeCards').innerHTML = (data.tree_recommendations || []).map(t => `
+    <div class="tree-card">
+      <div class="flex items-start gap-2 mb-2">
+        <span class="text-xl mt-0.5">🌳</span>
+        <div>
+          <p class="font-display text-sm font-700 text-white leading-snug">${t.species}</p>
+          <span class="metric-chip badge-green text-xs mt-1 inline-block">+${t.co2_absorbed_per_year_kg} kg CO₂/yr</span>
+        </div>
+      </div>
+      <p class="text-xs text-slate-400 leading-relaxed">${t.reason}</p>
+    </div>
+  `).join('');
+
+  // Infrastructure
+  const typeIcons = { Water: '💧', Carbon: '🌫️', Cooling: '❄️', Energy: '⚡', Biodiversity: '🦋' };
+  const typeColors = { Water: 'rgba(56,189,248,0.15)', Carbon: 'rgba(148,163,184,0.15)', Cooling: 'rgba(99,179,237,0.15)', Energy: 'rgba(250,204,21,0.1)', Biodiversity: 'rgba(52,211,153,0.1)' };
+  document.getElementById('infraCards').innerHTML = (data.infrastructure_solutions || []).map(s => `
+    <div class="infra-card" style="background:linear-gradient(135deg,${typeColors[s.type] || 'rgba(51,65,85,0.3)'} 0%,rgba(15,26,13,0.4) 100%)">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-base">${typeIcons[s.type] || '🔧'}</span>
+        <span class="metric-chip text-xs" style="background:rgba(56,189,248,0.15);color:#7dd3fc;border:1px solid rgba(56,189,248,0.3)">${s.type}</span>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed">${s.solution}</p>
+    </div>
+  `).join('');
+
+  // Before/After
+  renderBeforeAfter(data, envData);
+
+  // Trigger reveal animations
+  setTimeout(() => {
+    document.querySelectorAll('.reveal').forEach((el, i) => {
+      setTimeout(() => el.classList.add('visible'), i * 120);
+    });
+  }, 100);
+
+  // Re-init lucide
+  lucide.createIcons();
+}
+
+function renderGauges(data, envData) {
+  const gaugeContainer = document.getElementById('r-gauges');
+  const gaugeData = [
+    { label: 'Current ESG Score', val: envData.currentESGScore, color: envData.currentESGScore >= 70 ? '#34d399' : envData.currentESGScore >= 45 ? '#f59e0b' : '#ef4444', icon: '🌍' },
+    { label: 'Climate Resilience', val: envData.climateResilience || 50, color: '#60a5fa', icon: '🛡️' },
+    { label: 'Vulnerability Score', val: data.vulnerability_score, color: data.vulnerability_score > 50 ? '#ef4444' : '#f59e0b', icon: '⚠️', invert: true },
+    { label: 'Projected ESG', val: data.projected_improvement_score, color: '#34d399', icon: '📈' },
+  ];
+
+  gaugeContainer.innerHTML = gaugeData.map((g, i) => {
+    const pct = Math.round(g.val);
+    const r = 36;
+    const circ = 2 * Math.PI * r;
+    const dash = circ * (pct / 100);
+    return `
+      <div class="card p-4 flex flex-col items-center reveal" style="animation-delay:${i * 100}ms">
+        <p class="text-xs text-slate-500 font-500 mb-2 text-center">${g.label}</p>
+        <div class="relative">
+          <svg width="90" height="90" viewBox="0 0 90 90">
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="#1e293b" stroke-width="7"/>
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="${g.color}" stroke-width="7"
+              stroke-linecap="round" stroke-dasharray="${dash} ${circ}"
+              transform="rotate(-90 45 45)"
+              style="filter:drop-shadow(0 0 6px ${g.color}55);transition:stroke-dasharray 1s ease"/>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-xs mb-0.5">${g.icon}</span>
+            <span class="font-display text-base font-700 text-white">${pct}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderHeatmap(envData) {
+  const grid = document.getElementById('heatmapGrid');
+  const keys = ['aqi','greenCover','carbonEmission','waterQuality','biodiversity','soilFertility','climateResilience','wasteEfficiency','renewableEnergy','floodProb','wildfireRisk','droughtSeverity','noise','humidity','rainfall','avgTemp','urbanRate','groundwater','windSpeed','soilPH'];
+  const cfgMap = {};
+  [...ENV_SLIDERS, ...GEO_FIELDS, ...RISK_FIELDS].forEach(c => { cfgMap[c.id] = c; });
+
+  // Build 10x10 grid with slight spatial variance for visual interest
+  const cells = [];
+  for (let i = 0; i < 100; i++) {
+    const keyIdx = i % keys.length;
+    const key = keys[keyIdx];
+    const cfg = cfgMap[key];
+    const val = envData[key];
+    const sev = cfg ? getSeverity(cfg, val) : 'green';
+    // Add slight noise for spatial variance
+    const noiseOffset = (Math.random() > 0.7) ? (sev === 'green' ? 'yellow' : sev === 'yellow' ? (Math.random() > 0.5 ? 'red' : 'green') : 'yellow') : sev;
+    cells.push(noiseOffset);
+  }
+
+  const colors = {
+    green: ['#15803d','#16a34a','#22c55e','#4ade80','#166534'],
+    yellow: ['#d97706','#f59e0b','#fbbf24','#b45309','#ca8a04'],
+    red: ['#dc2626','#ef4444','#b91c1c','#f87171','#991b1b'],
+  };
+
+  grid.innerHTML = cells.map((sev, i) => {
+    const colorArr = colors[sev];
+    const bg = colorArr[i % colorArr.length];
+    const opacity = 0.5 + Math.random() * 0.5;
+    return `<div class="heatmap-cell aspect-square" style="background:${bg};opacity:${opacity.toFixed(2)};height:22px" title="${sev}"></div>`;
+  }).join('');
+}
+
+function renderChart(data, envData) {
+  const ctx = document.getElementById('esgChart')?.getContext('2d');
+  if (!ctx) return;
+  if (state.chart) { state.chart.destroy(); state.chart = null; }
+
+  const labels = ['Air Quality', 'Green Cover', 'Biodiversity', 'Water Quality', 'Carbon Mgmt', 'Renewables', 'Resilience'];
+  const current = [
+    Math.max(0, Math.round(100 - (envData.aqi / 5))),
+    Math.round(envData.greenCover),
+    Math.round(envData.biodiversity),
+    Math.round(envData.waterQuality),
+    Math.round(100 - (envData.carbonEmission / 5)),
+    Math.round(envData.renewableEnergy),
+    Math.round(envData.climateResilience),
+  ].map(v => Math.min(100, Math.max(0, v)));
+
+  const delta = data.projected_improvement_score - envData.currentESGScore;
+  const deltaFactor = 1 + (delta / 100) * 0.6;
+  const projected = current.map(v => Math.min(100, Math.round(v * deltaFactor + (Math.random() * 6 - 3))));
+
+  state.chart = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Current State',
+          data: current,
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,0.08)',
+          borderWidth: 2,
+          pointBackgroundColor: '#ef4444',
+          pointRadius: 4,
+        },
+        {
+          label: 'Projected (5yr)',
+          data: projected,
+          borderColor: '#34d399',
+          backgroundColor: 'rgba(52,211,153,0.1)',
+          borderWidth: 2,
+          pointBackgroundColor: '#34d399',
+          pointRadius: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { family: 'DM Sans', size: 11 }, boxWidth: 12 } },
+      },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          angleLines: { color: 'rgba(51,65,85,0.5)' },
+          grid: { color: 'rgba(51,65,85,0.4)' },
+          pointLabels: { color: '#94a3b8', font: { family: 'DM Sans', size: 10 } },
+          ticks: { color: '#475569', backdropColor: 'transparent', font: { size: 9 }, stepSize: 25 },
+        },
+      },
+    },
+  });
+}
+
+function renderBeforeAfter(data, envData) {
+  const delta = data.projected_improvement_score - envData.currentESGScore;
+  const before = [
+    `🔴 ESG Score: ${envData.currentESGScore}/100`,
+    `🔴 AQI: ${Math.round(envData.aqi)} ${envData.aqi > 150 ? '(Unhealthy)' : envData.aqi > 50 ? '(Moderate)' : '(Good)'}`,
+    `🔴 Green Cover: ${Math.round(envData.greenCover)}% of total area`,
+    `🔴 Carbon Emission: ${Math.round(envData.carbonEmission)} t/km²`,
+    `🔴 Biodiversity Score: ${Math.round(envData.biodiversity)}/100`,
+    `🔴 Climate Resilience: ${Math.round(envData.climateResilience)}/100`,
+  ];
+  const after = [
+    `✅ ESG Score: ${data.projected_improvement_score}/100 (+${delta} pts)`,
+    `✅ AQI: Estimated ${Math.max(15, Math.round(envData.aqi * 0.6))} (post-intervention)`,
+    `✅ Green Cover: ${Math.min(100, Math.round(envData.greenCover + 15))}% projected`,
+    `✅ Carbon Offset: ${(data.tree_recommendations || []).reduce((s, t) => s + (t.co2_absorbed_per_year_kg || 0), 0)} kg CO₂/yr absorbed`,
+    `✅ Biodiversity Score: ${Math.min(100, Math.round(envData.biodiversity + 18))}/100`,
+    `✅ Climate Resilience: ${Math.min(100, Math.round(envData.climateResilience + 20))}/100`,
+  ];
+
+  document.getElementById('beforeList').innerHTML = before.map(b => `<li class="flex items-start gap-1.5 text-xs">${b}</li>`).join('');
+  document.getElementById('afterList').innerHTML = after.map(a => `<li class="flex items-start gap-1.5 text-xs">${a}</li>`).join('');
+}
+
+// ─────────────────────────────────────────────
+// PDF EXPORT
+// ─────────────────────────────────────────────
+function exportPDF() {
+  const element = document.getElementById('resultsContent');
+  const opt = {
+    margin: [10, 10, 10, 10],
+    filename: `EcoSuggest-ESG-Report-${new Date().toISOString().slice(0,10)}.pdf`,
+    image: { type: 'jpeg', quality: 0.96 },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#020d07' },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+  };
+  html2pdf().set(opt).from(element).save();
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  buildSliders();
+  buildSimulator();
+  updateModeIndicator();
+  calcLiveESG();
+  lucide.createIcons();
+
+  // Restore saved credentials to UI
+  document.getElementById('or-key').value = state.orKey;
+  document.getElementById('or-model').value = state.orModel;
+  document.getElementById('sb-url').value = state.sbUrl;
+  document.getElementById('sb-anon').value = state.sbAnon;
+
+  // Activate correct mode tab on load
+  const savedMode = state.mode;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.dataset.mode === savedMode) {
+      b.classList.add('active');
+      b.classList.remove('text-slate-400');
+      document.getElementById(`panel-${savedMode}`).classList.remove('hidden');
+    } else {
+      b.classList.remove('active');
+      b.classList.add('text-slate-400');
+      document.getElementById(`panel-${b.dataset.mode}`)?.classList.add('hidden');
+    }
+  });
+});
+</script>
+</body>
+</html>
