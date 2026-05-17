@@ -1,4 +1,4 @@
-# 🌿 EcoSuggest — ESG Decision Dashboard
+# 🌿 Touch of Nature — ESG Decision Dashboard
 
 > **A premium enterprise-grade single-file frontend web application for AI-driven environmental analysis, botanical recommendation, and sustainability reporting.**
 
